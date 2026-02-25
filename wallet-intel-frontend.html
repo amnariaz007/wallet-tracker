@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CHAIN.LENS — Wallet Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #090b0e;
+    --surface: #0f1318;
+    --surface2: #161c24;
+    --border: #1e2a36;
+    --border-bright: #2a3d52;
+    --accent: #00e5ff;
+    --accent2: #ff3d71;
+    --accent3: #39ff14;
+    --text: #c8d8e8;
+    --text-dim: #5a7080;
+    --text-bright: #e8f4ff;
+    --mono: "Space Mono", monospace;
+    --sans: "DM Sans", sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(9,11,14,0.9);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .eth-price {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+  }
+
+  .eth-price span:last-child {
+    color: var(--accent3);
+    font-weight: 700;
+  }
+
+  /* ── Layout ── */
+  .app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 1fr;
+    height: calc(100vh - 65px);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: rgba(15,19,24,0.7);
+  }
+
+  .sidebar-top {
+    padding: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .search-wrap {
+    position: relative;
+  }
+
+  .search-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 14px 12px 40px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .search-input::placeholder { color: var(--text-dim); }
+
+  .search-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,229,255,0.08), inset 0 0 20px rgba(0,229,255,0.02);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    width: 100%;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  .btn-primary:hover {
+    background: #33ecff;
+    box-shadow: 0 0 20px rgba(0,229,255,0.3);
+  }
+
+  .btn-primary:active { transform: scale(0.98); }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Quick wallets */
+  .quick-wallets {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .quick-btn {
+    display: inline-block;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    margin: 3px 3px 0 0;
+    transition: all 0.15s;
+  }
+
+  .quick-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+
+  /* ── Wallet Card ── */
+  .wallet-card {
+    padding: 24px;
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .wallet-address {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    word-break: break-all;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+  .wallet-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.green { color: var(--accent3); }
+
+  /* ── Transactions list ── */
+  .tx-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px;
+  }
+
+  .tx-list::-webkit-scrollbar { width: 4px; }
+  .tx-list::-webkit-scrollbar-track { background: transparent; }
+  .tx-list::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  .tx-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    margin: 0 -8px;
+    padding: 10px 8px;
+    border-radius: 4px;
+  }
+
+  .tx-item:hover { background: var(--surface2); }
+
+  .tx-arrow {
+    font-size: 10px;
+    padding: 3px 6px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .tx-out { background: rgba(255,61,113,0.15); color: var(--accent2); }
+  .tx-in  { background: rgba(57,255,20,0.1);  color: var(--accent3); }
+
+  .tx-details { flex: 1; min-width: 0; }
+
+  .tx-hash {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tx-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .tx-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-bright);
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  /* ── Main panel ── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(15,19,24,0.5);
+  }
+
+  .panel-tabs {
+    display: flex;
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 6px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: none;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    color: var(--accent);
+    border-color: var(--border);
+    background: var(--surface2);
+  }
+
+  /* ── Graph ── */
+  .graph-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #graph-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .graph-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(15,19,24,0.95);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 11px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Empty / loading states ── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--text-dim);
+  }
+
+  .empty-icon {
+    font-size: 48px;
+    opacity: 0.2;
+  }
+
+  .empty-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .empty-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    z-index: 999;
+    display: none;
+    animation: slideIn 0.25s ease;
+  }
+
+  .toast.error { border-color: var(--accent2); color: var(--accent2); }
+  .toast.success { border-color: var(--accent3); color: var(--accent3); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Tooltip ── */
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-bright);
+    z-index: 100;
+    display: none;
+    min-width: 200px;
+    line-height: 1.8;
+  }
+
+  /* ── Stats panel ── */
+  .stats-panel {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .big-stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+
+  .big-stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .big-stat-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+
+  .connections-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .connections-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .connections-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .connections-table tr:hover td { background: var(--surface2); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .badge-out { background: rgba(255,61,113,0.15); color: var(--accent2); }
+  .badge-in  { background: rgba(57,255,20,0.1);  color: var(--accent3); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    CHAIN.LENS
+  </div>
+  <div class="header-right">
+    <div class="eth-price">
+      <span>ETH/USD</span>
+      <span id="eth-price">—</span>
+    </div>
+    <span style="color:var(--border-bright)">|</span>
+    <span>MAINNET</span>
+  </div>
+</header>
+
+<div class="app">
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <div class="section-label">// Analyze Wallet</div>
+      <div class="search-wrap">
+        <span class="search-icon">⬡</span>
+        <input
+          class="search-input"
+          id="address-input"
+          type="text"
+          placeholder="0x... paste address"
+          spellcheck="false"
+        />
+      </div>
+      <button class="btn btn-primary" id="sync-btn" onclick="syncWallet()">
+        <span id="sync-btn-text">FETCH TRANSACTIONS</span>
+      </button>
+    </div>
+
+    <div class="quick-wallets">
+      <div class="section-label">// Demo Wallets</div>
+      <span class="quick-btn" onclick="setAddress('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')">Vitalik</span>
+      <span class="quick-btn" onclick="setAddress('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8')">Binance</span>
+      <span class="quick-btn" onclick="setAddress('0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503')">Whale</span>
+    </div>
+
+    <!-- Wallet info (shown after sync) -->
+    <div class="wallet-card" id="wallet-card" style="display:none">
+      <div class="section-label">// Wallet</div>
+      <div class="wallet-address" id="wallet-address"></div>
+      <div class="wallet-stats">
+        <div class="stat-box">
+          <div class="stat-label">Transactions</div>
+          <div class="stat-value accent" id="stat-txcount">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Connections</div>
+          <div class="stat-value green" id="stat-connections">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">First Seen</div>
+          <div class="stat-value" id="stat-first" style="font-size:11px">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Last Active</div>
+          <div class="stat-value" id="stat-last" style="font-size:11px">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TX list -->
+    <div class="tx-list" id="tx-list">
+      <div style="padding-top:20px; text-align:center">
+        <div class="section-label" style="text-align:center">No wallet loaded</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="panel-header">
+      <div class="panel-tabs">
+        <button class="tab active" onclick="switchTab('graph', this)">Graph</button>
+        <button class="tab" onclick="switchTab('stats', this)">Connections</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px">
+        <span id="graph-status">IDLE</span>
+      </div>
+    </div>
+
+    <!-- Graph tab -->
+    <div class="graph-container" id="tab-graph">
+      <svg id="graph-svg"></svg>
+
+      <div class="empty-state" id="graph-empty">
+        <div class="empty-icon">◈</div>
+        <div class="empty-title">Awaiting Analysis</div>
+        <div class="empty-sub">Enter a wallet address and fetch transactions</div>
+      </div>
+
+      <div class="graph-legend" id="graph-legend" style="display:none">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--accent);box-shadow:0 0 6px var(--accent)"></div>
+          Target Wallet
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#5588aa"></div>
+          Connected Wallet
+        </div>
+        <div class="legend-item" style="margin-bottom:0">
+          <div style="width:24px;height:1px;background:var(--accent);opacity:0.6;flex-shrink:0"></div>
+          Transaction Flow
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats tab -->
+    <div class="stats-panel" id="tab-stats">
+      <div id="stats-empty" style="text-align:center;padding-top:60px;color:var(--text-dim);font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase">
+        No data — sync a wallet first
+      </div>
+      <div id="stats-content" style="display:none">
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="section-label" style="margin-bottom:12px">// Direct Connections</div>
+        <table class="connections-table">
+          <thead>
+            <tr>
+              <th>Direction</th>
+              <th>Address</th>
+              <th>Transactions</th>
+              <th>Total ETH</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody id="connections-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:8000/api';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentAddress = null;
+let graphData = null;
+let simulation = null;
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type}`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3200);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setAddress(addr) {
+  document.getElementById('address-input').value = addr;
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.getElementById('tab-graph').style.display = name === 'graph' ? 'flex' : 'none';
+  document.getElementById('tab-stats').style.display = name === 'stats' ? 'flex' : 'none';
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+}
+
+function fmtAddr(addr) {
+  if (!addr) return '—';
+  return addr.slice(0, 6) + '...' + addr.slice(-4);
+}
+
+function fmtEth(val) {
+  const n = parseFloat(val);
+  if (isNaN(n) || n === 0) return '0 ETH';
+  if (n < 0.001) return '<0.001 ETH';
+  return n.toFixed(4) + ' ETH';
+}
+
+// ── Sync wallet ───────────────────────────────────────────────────────────────
+async function syncWallet() {
+  const address = document.getElementById('address-input').value.trim();
+  if (!address || !address.startsWith('0x') || address.length !== 42) {
+    showToast('Invalid Ethereum address', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('sync-btn');
+  const btnText = document.getElementById('sync-btn-text');
+  btn.disabled = true;
+  btnText.textContent = 'SYNCING...';
+  document.getElementById('graph-status').textContent = 'FETCHING...';
+
+  try {
+    // 1. Sync transactions
+    const syncRes = await fetch(`${API_BASE}/wallets/sync/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, max_pages: 3 }),
+    });
+
+    if (!syncRes.ok) {
+      const err = await syncRes.json();
+      throw new Error(err.error || 'Sync failed');
+    }
+
+    const syncData = await syncRes.json();
+    currentAddress = address.toLowerCase();
+
+    // 2. Fetch wallet details
+    const walletRes = await fetch(`${API_BASE}/wallets/${currentAddress}/`);
+    if (!walletRes.ok) throw new Error('Failed to load wallet');
+    const walletData = await walletRes.json();
+
+    // 3. Fetch graph
+    const graphRes = await fetch(`${API_BASE}/wallets/${currentAddress}/graph/?depth=1`);
+    if (!graphRes.ok) throw new Error('Failed to load graph');
+    graphData = await graphRes.json();
+
+    // 4. Fetch connections
+    const connRes = await fetch(`${API_BASE}/wallets/${currentAddress}/connections/`);
+    const connData = connRes.ok ? await connRes.json() : null;
+
+    // Update UI
+    updateWalletCard(walletData.wallet);
+    updateTxList(walletData.transactions, currentAddress);
+    renderGraph(graphData);
+    if (connData) updateStatsPanel(walletData.wallet, connData);
+
+    document.getElementById('graph-status').textContent =
+      `${syncData.synced} TXS LOADED`;
+
+    showToast(`Synced ${syncData.synced} transactions`, 'success');
+
+  } catch (err) {
+    // Demo mode: render mock data if API is not running
+    console.warn('API not available, rendering demo data:', err.message);
+    renderDemoMode(address);
+    document.getElementById('graph-status').textContent = 'DEMO MODE';
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = 'FETCH TRANSACTIONS';
+  }
+}
+
+function updateWalletCard(wallet) {
+  document.getElementById('wallet-card').style.display = 'block';
+  document.getElementById('wallet-address').textContent = wallet.address;
+  document.getElementById('stat-txcount').textContent = wallet.tx_count || '—';
+  document.getElementById('stat-first').textContent = fmtDate(wallet.first_seen);
+  document.getElementById('stat-last').textContent = fmtDate(wallet.last_seen);
+}
+
+function updateTxList(transactions, myAddress) {
+  const list = document.getElementById('tx-list');
+  if (!transactions || !transactions.length) {
+    list.innerHTML = '<div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--text-dim);text-align:center">No transactions</div>';
+    return;
+  }
+
+  list.innerHTML = transactions.slice(0, 40).map(tx => {
+    const isOut = tx.from_address === myAddress;
+    const peer = isOut ? tx.to_address : tx.from_address;
+    return `
+      <div class="tx-item" onclick="openEtherscan('${tx.tx_hash}')">
+        <span class="tx-arrow ${isOut ? 'tx-out' : 'tx-in'}">${isOut ? 'OUT' : ' IN'}</span>
+        <div class="tx-details">
+          <div class="tx-hash">${tx.tx_hash.slice(0, 18)}...</div>
+          <div class="tx-meta">${fmtAddr(peer)} · ${fmtDate(tx.timestamp)}</div>
+        </div>
+        <div class="tx-value">${fmtEth(tx.value_eth)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openEtherscan(hash) {
+  window.open(`https://etherscan.io/tx/${hash}`, '_blank');
+}
+
+function updateStatsPanel(wallet, connData) {
+  document.getElementById('stats-empty').style.display = 'none';
+  document.getElementById('stats-content').style.display = 'block';
+
+  const totalConn = connData.total_connections;
+  document.getElementById('stat-connections').textContent = totalConn;
+
+  const totalEth = [...connData.outgoing, ...connData.incoming]
+    .reduce((s, e) => s + parseFloat(e.total_value_eth || 0), 0);
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="big-stat">
+      <div class="big-stat-label">Total Connections</div>
+      <div class="big-stat-value" style="color:var(--accent)">${totalConn}</div>
+    </div>
+    <div class="big-stat">
+      <div class="big-stat-label">Outgoing</div>
+      <div class="big-stat-value" style="color:var(--accent2)">${connData.outgoing.length}</div>
+    </div>
+    <div class="big-stat">
+      <div class="big-stat-label">Total ETH Flow</div>
+      <div class="big-stat-value" style="color:var(--accent3);font-size:18px">${totalEth.toFixed(3)}</div>
+    </div>
+  `;
+
+  const tbody = document.getElementById('connections-tbody');
+  const rows = [
+    ...connData.outgoing.map(e => ({ ...e, dir: 'out', peer: e.target })),
+    ...connData.incoming.map(e => ({ ...e, dir: 'in', peer: e.source })),
+  ].sort((a, b) => b.tx_count - a.tx_count);
+
+  tbody.innerHTML = rows.map(e => `
+    <tr>
+      <td><span class="badge badge-${e.dir}">${e.dir.toUpperCase()}</span></td>
+      <td style="color:var(--accent);cursor:pointer" onclick="setAddress('${e.peer}');syncWallet()">
+        ${fmtAddr(e.peer)}
+      </td>
+      <td>${e.tx_count}</td>
+      <td>${fmtEth(e.total_value_eth)}</td>
+      <td>${fmtDate(e.last_interaction)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:16px">No connections found</td></tr>';
+}
+
+// ── D3 Graph ──────────────────────────────────────────────────────────────────
+function renderGraph(data) {
+  const { nodes, edges } = data;
+  if (!nodes.length) return;
+
+  document.getElementById('graph-empty').style.display = 'none';
+  document.getElementById('graph-legend').style.display = 'block';
+
+  const svg = d3.select('#graph-svg');
+  svg.selectAll('*').remove();
+
+  const W = svg.node().clientWidth;
+  const H = svg.node().clientHeight;
+
+  // Defs: arrowhead
+  const defs = svg.append('defs');
+  defs.append('marker')
+    .attr('id', 'arrow')
+    .attr('viewBox', '0 -4 8 8')
+    .attr('refX', 18)
+    .attr('refY', 0)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+      .attr('d', 'M0,-4L8,0L0,4')
+      .attr('fill', 'rgba(0,229,255,0.4)');
+
+  const g = svg.append('g');
+
+  // Zoom
+  svg.call(d3.zoom()
+    .scaleExtent([0.2, 4])
+    .on('zoom', e => g.attr('transform', e.transform))
+  );
+
+  // Simulation
+  if (simulation) simulation.stop();
+  simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id(d => d.id).distance(120).strength(0.6))
+    .force('charge', d3.forceManyBody().strength(-350))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide(28));
+
+  // Edges
+  const link = g.append('g').selectAll('line')
+    .data(edges).join('line')
+    .attr('stroke', 'rgba(0,229,255,0.2)')
+    .attr('stroke-width', d => Math.max(1, Math.log(d.tx_count + 1)))
+    .attr('marker-end', 'url(#arrow)');
+
+  // Nodes
+  const node = g.append('g').selectAll('g')
+    .data(nodes).join('g')
+    .attr('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (e, d) => {
+        if (!e.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
+      })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => {
+        if (!e.active) simulation.alphaTarget(0);
+        d.fx = null; d.fy = null;
+      })
+    )
+    .on('click', (e, d) => {
+      setAddress(d.id);
+      showToast(`Address copied: ${fmtAddr(d.id)}`, 'info');
+      navigator.clipboard?.writeText(d.id).catch(() => {});
+    })
+    .on('mouseover', (e, d) => {
+      const tip = document.getElementById('tooltip');
+      tip.style.display = 'block';
+      tip.innerHTML = `
+        <div style="color:var(--accent);margin-bottom:4px">${fmtAddr(d.id)}</div>
+        <div>Transactions: <span style="color:var(--text-bright)">${d.tx_count || '—'}</span></div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:6px">Click to set as target</div>
+      `;
+    })
+    .on('mousemove', (e) => {
+      const tip = document.getElementById('tooltip');
+      tip.style.left = (e.pageX + 12) + 'px';
+      tip.style.top = (e.pageY - 30) + 'px';
+    })
+    .on('mouseout', () => {
+      document.getElementById('tooltip').style.display = 'none';
+    });
+
+  // Glow circle (main node)
+  node.each(function(d) {
+    const isTarget = d.id === currentAddress;
+    const el = d3.select(this);
+
+    if (isTarget) {
+      el.append('circle')
+        .attr('r', 18)
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--accent)')
+        .attr('stroke-width', 1)
+        .attr('opacity', 0.3);
+    }
+
+    el.append('circle')
+      .attr('r', isTarget ? 12 : 8)
+      .attr('fill', isTarget ? 'var(--accent)' : '#2a4a6a')
+      .attr('stroke', isTarget ? 'rgba(0,229,255,0.5)' : 'rgba(80,140,200,0.3)')
+      .attr('stroke-width', 2);
+
+    el.append('text')
+      .attr('y', (isTarget ? 12 : 8) + 14)
+      .attr('text-anchor', 'middle')
+      .attr('font-family', 'Space Mono, monospace')
+      .attr('font-size', isTarget ? 10 : 9)
+      .attr('fill', isTarget ? 'var(--accent)' : 'var(--text-dim)')
+      .text(fmtAddr(d.id));
+  });
+
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+// ── Demo Mode (when API is offline) ──────────────────────────────────────────
+function renderDemoMode(address) {
+  const addr = address.toLowerCase();
+  currentAddress = addr;
+
+  const demoWallet = {
+    address: addr,
+    tx_count: 247,
+    first_seen: '2021-03-14T00:00:00Z',
+    last_seen: '2024-11-20T00:00:00Z',
+  };
+
+  updateWalletCard(demoWallet);
+  document.getElementById('stat-connections').textContent = 12;
+
+  // Mock tx list
+  const mockTxs = Array.from({ length: 8 }, (_, i) => ({
+    tx_hash: '0x' + Math.random().toString(16).slice(2).padEnd(64, '0'),
+    from_address: i % 2 === 0 ? addr : '0xdead' + i,
+    to_address: i % 2 === 0 ? '0xbeef' + i : addr,
+    value_eth: (Math.random() * 2).toFixed(4),
+    timestamp: new Date(Date.now() - i * 86400000).toISOString(),
+  }));
+  updateTxList(mockTxs, addr);
+
+  // Mock graph
+  const peers = Array.from({ length: 8 }, (_, i) => ({
+    id: '0x' + i.toString().padStart(40, Math.random().toString(16).slice(2)),
+    tx_count: Math.floor(Math.random() * 30) + 1,
+  }));
+
+  const demoGraph = {
+    nodes: [{ id: addr, tx_count: 247 }, ...peers],
+    edges: peers.map((p, i) => ({
+      source: i % 3 === 0 ? p.id : addr,
+      target: i % 3 === 0 ? addr : p.id,
+      tx_count: Math.floor(Math.random() * 20) + 1,
+      value_eth: Math.random() * 5,
+    })),
+  };
+
+  renderGraph(demoGraph);
+  showToast('Demo mode — connect Django backend for live data', 'info');
+}
+
+// ── ETH Price ─────────────────────────────────────────────────────────────────
+async function loadEthPrice() {
+  try {
+    const res = await fetch(`${API_BASE}/eth-price/`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const price = parseFloat(data.ethusd).toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+    });
+    document.getElementById('eth-price').textContent = price;
+  } catch {
+    document.getElementById('eth-price').textContent = '—';
+  }
+}
+
+// ── Enter key ─────────────────────────────────────────────────────────────────
+document.getElementById('address-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') syncWallet();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadEthPrice();
+// Set tab-graph flex display
+document.getElementById('tab-graph').style.display = 'flex';
+document.getElementById('tab-graph').style.flexDirection = 'column';
+</script>
+</body>
+</html>
